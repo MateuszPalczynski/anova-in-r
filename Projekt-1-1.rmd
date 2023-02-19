@@ -1,0 +1,159 @@
+---
+title: "Projekt"
+author: "PałczyńskiMateusz"
+date: "4 06 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+# Średnia jakość batonów czekoladowych w zależności od kraju pochodzenia
+
+## Spis treści:
+## 1.Ocena jakości batoników przez respondentów.
+## 2.Wczytywanie danych
+## 3.Wstępna analiza danych
+## 4.Postawienie problemu
+## 5.Sprawdzenie założeń ANOVA
+## 6.Test ANOVA
+## 7.Test post-hoc
+## 8.Wnioski
+
+## 1. Ocena jakości batoników przez respondentów.
+Dane dotyczą ocen batonów z odpowiednich krajów. W ich skład wchodzą: 
+nazwa firmy, wskaźnik referencyjny, rok zebrania danych, procent zawartości kakao, ocena i rodzaj nasion kakao oraz kraju pochodzenia nasion. Batony oceniane są w skali 1 — 5 przez 5 losowych grup około 15 osób. Każda z tych grup dotyczyła oceny w innym kraju.
+
+## 2. Wczytywanie danych
+
+```{r}
+dane1<- read.csv('flavors_of_cacao.csv', head = TRUE)
+#w celach badawcych bierzemy miarodajną próbkę z bazy danych
+dane <- dane1[c(10:21, 45:59, 76:88,122:136, 448:462), ]
+head(dane)
+lokalizacje <- dane $ Company.Location 
+oceny <- dane $ Rating
+lok_oceny <- factor (lokalizacje,
+             levels = c("France", "U.S.A.", "Italy", "U.K.", "Germany"))
+```
+## 3. Wstępna analiza danych
+```{r}
+summary(oceny)
+```
+
+```{r}
+średnie <- by(oceny ,lokalizacje ,mean)
+średnie
+```
+
+```{r}
+boxplot(oceny ~ lokalizacje, range = 0)
+points(średnie, col = "purple", pch = 16)
+```
+## 4. Postawienie problemu
+Stawiamy hipotezę, że średnie oceny batonów ze wszystkich krajów są sobie równ przeciw hipotezie alternatywnej - 
+istnieją takie dwie lokazizacje, dla których średnie są różne.
+
+## 5. Sprawdzenie założeń ANOVA
+
+I.Dane te zostały pozyskane w sposób losowy - spełnione.
+II.Pochodzą z rozkładu normalnego - narysujmy histogramy dla poszczególnych populacji. 
+  Naniesiemy na wykresy odpowiadające kolejnym ocenom gęstości.
+
+```{r}
+France = subset(dane, subset = (Company.Location == "France"))
+U.S.A. = subset(dane, subset = (Company.Location == "U.S.A."))
+U.K. = subset(dane, subset = (Company.Location == "U.K."))
+Italy = subset(dane, subset = (Company.Location == "Italy"))
+Germany = subset(dane, subset = (Company.Location == "Germany"))
+
+par(mfrow=c(2,3))
+hist(France[,7],las = 1, main = "France histogram",prob = TRUE,
+                      col = "orange1",
+                      lwd = 2,
+                      xlab = "Oceny - Francja",
+                      ylim=c(0,1.5))
+lines(density(France[,7]),lwd = 2)
+
+hist(U.S.A.[,7],las = 1, main = "U.S.A. histogram",prob = TRUE,
+                      col = "red",
+                      lwd = 2,
+                      xlab = "oceny - U.S.A.",
+                      ylim=c(0,1.5))
+lines(density(U.S.A.[,7]),lwd = 2)
+
+hist(U.K.[,7],las = 1, main = "U.K. histogram",prob = TRUE,
+                      col = "blue",
+                      lwd = 2,
+                      xlab = "oceny - U.K.",
+                      ylim=c(0,1.5))
+lines(density(U.K.[,7]),lwd = 2)
+
+hist(Germany[,7],las = 1, main = "Germany histogram",prob = TRUE,
+                      col = "purple",
+                      lwd = 2,
+                      xlab = "oceny - Niemcy",
+                      ylim=c(0,1.5))
+lines(density(Germany[,7]),lwd = 2)
+
+hist(Italy[,7],las = 1, main = "Italy histogram",prob = TRUE,
+                      col = "green",
+                      lwd = 2,
+                      xlab = "oceny - Włochy",
+                      ylim=c(0,1.5))
+lines(density(Italy[,7]),lwd = 2)
+
+
+```
+Oraz sprawdzimy czy próbka pochodzi z rozkładu normalnego za pomocą testu Shapiro-Wilka.
+```{r}
+shapiro.test(oceny [lok_oceny == "France"])
+```
+```{r}
+shapiro.test(oceny [lok_oceny == "U.S.A."])
+```
+```{r}
+shapiro.test(oceny [lok_oceny == "Germany"])
+```
+
+```{r}
+shapiro.test(oceny [lok_oceny == "Italy"])
+```
+```{r}
+shapiro.test(oceny [lok_oceny == "U.K."])
+```
+Dane dla Niemiec i USA nie spełniają naszych założeń o tym, że są z rozkładu normalnego.
+W celach badawczych przeprowadzimy jednak naszą analizę.
+
+III.Jednorodność wariancji zmiennych losowych.
+
+```{r}
+by(oceny ,lokalizacje , var )
+
+```
+
+Wariancje poszczególnych wyników z lokalizacji nie odbiegają znacznie od siebie.
+Jednak dla upewnienia się przeprowadzimy test Barletta.
+
+```{r}
+bartlett.test(oceny ~ lokalizacje, data = dane)
+
+```
+Test potwierdził nasze przypuszczenie.
+## 6. Test ANOVA
+Możemy teraz przejść do naszego finalnego testu ANOVA
+
+```{r}
+anova (lm(oceny ~ lokalizacje))
+```
+Odrzucamy hipotezę zerową, tzn. istnieje taka para krajów, z których średnie ocen batonów są od siebie różne. Najmniejszym poziomem istotności z tutaj wymienionych dla którego odrzucamy hipotezę zerową jest 0.001.
+
+## 7. Test post-hoc
+Przeprowadźmy test post-hoc (na poziomie ufności 95%) — Test Tukeya, aby wzbogacić analizę o dodatkowe — dokładniejsze wnioski;
+średnie ocen z których krajów są parami różne. 
+
+
+```{r}
+TukeyHSD (aov(oceny ~ lok_oceny ), conf.level = 0.95)
+```
+## 8. Wnioski
+Zauważmy, że średnie są różne jedynie dla relacji: Włochy-U.S.A., Włochy-Wielka Brytania, Włochy-Niemcy.
+Możemy więc stwierdzić, że średnia jakość batoników we Włoszech jest widocznie lepsza niżeli w Stanach Zjednoczonych, Niemczech czy na Wyspach Brytyjskich. Nie mamy jednak wiedzy by uznać wyższość batoników z Włoch ponad tych pochodzących z Francji.
